@@ -3,12 +3,12 @@
     "builds": [
         {
             "src": "main.py",
-            "use": "@vercel/static"
+            "use": "@vercel/python"
         }
     ],
     "routes": [
         {
-            "src": "/main.py",
+            "src": "/(.*)",
             "dest": "/main.py"
         }
     ]
