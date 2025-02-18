@@ -10,7 +10,6 @@ app = FastAPI()
 TELEX_CHANNEL_ID = os.getenv("TELEX_CHANNEL_ID")
 TELEX_WEBHOOK_URL = f"https://ping.telex.im/v1/webhooks/{TELEX_CHANNEL_ID}"
 
-
 @app.post("/zendesk-integration/")
 async def zendesk_integration(request: Request):
     try:
