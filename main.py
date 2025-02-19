@@ -16,36 +16,32 @@ async def zendesk_integration(request: Request):
         data = await request.json()
         ticket = data.get("ticket", {})
 
-        # Extract required ticket details
+        # Extract ticket details
         ticket_id = ticket.get("id", "Unknown")
-        status = ticket.get("status", "Unknown")
-        priority = ticket.get("priority", "Unknown")
-        subject = ticket.get("subject", "No Subject")
         requester = ticket.get("requester", {})
-        requester_name = requester.get("name", "Unknown")
+        subject = ticket.get("subject", "No Subject")
         requester_email = requester.get("email", "Unknown")
-
-        telex_payload = {
-            "channel": TELEX_CHANNEL_ID,
-            "event": "message",
-            "data": {
-                "text": (
-                    f"Ticket #{ticket_id} Updated!\n"
-                    f"Subject: {subject}\n"
-                    f"Status: {status}\n"
-                    f"Priority: {priority}\n"
-                    f"Opened by: {requester_name} ({requester_email})"
-                )
-            }
-        }
         
-        # Send notification to Telex 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(TELEX_WEBHOOK_URL, json=telex_payload)
-            response.raise_for_status()
+        payload = {
+            "event_name": f"Ticket #{ticket_id}",
+            "message": f"{subject} - {requester_email}",
+            "status": "success",
+            "username": requester.get("name", "Unknown")
+        }
 
-        return {"message": "Sent to Telex", "telex_payload": telex_payload}
-    
+        # Send notification to Telex
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                TELEX_WEBHOOK_URL,
+                json=payload,
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json"
+                }
+            )
+            response.raise_for_status()
+            return response.json()
+
     except httpx.RequestError as req_error:
         return {"error": "Failed to send request to Telex", "details": str(req_error)}
     
