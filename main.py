@@ -6,11 +6,16 @@ from dotenv import load_dotenv
 import httpx
 import os
 import uvicorn
+import logging
 
+# Load environment variables
 load_dotenv()
 
-# Initialize FastAPI 
+# Initialize FastAPI
 app = FastAPI()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 # Configure CORS
 app.add_middleware(
@@ -21,7 +26,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Retrieve Telex webhook details
 TELEX_CHANNEL_ID = os.getenv("TELEX_CHANNEL_ID")
+if not TELEX_CHANNEL_ID:
+    raise ValueError("TELEX_CHANNEL_ID is not set in environment variables!")
+
 TELEX_WEBHOOK_URL = f"https://ping.telex.im/v1/webhooks/{TELEX_CHANNEL_ID}"
 
 @app.post("/zendesk-integration")
@@ -29,23 +38,30 @@ async def zendesk_integration(request: Request) -> JSONResponse:
     try:
         data = await request.json()
         ticket = data.get("ticket", {})
-        print(data)
-        
-        # Extract ticket details
+
+        # Validate required fields
+        if not ticket:
+            raise KeyError("Missing 'ticket' data in request.")
+
+        # Extract ticket details safely
         ticket_id = str(ticket.get("id", "Unknown"))
         requester = ticket.get("requester", {})
         subject = ticket.get("subject", "No Subject")
         requester_email = requester.get("email", "Unknown")
-        
+        status = ticket.get("status", "Unknown")
+        priority = ticket.get("priority", "Unknown")
+
+        # Construct payload for Telex
         telex_payload = {
             "channel": TELEX_CHANNEL_ID,
             "event": "message",
             "data": {
-                "text": f"Ticket #{ticket_id} Updated!\nSubject: {subject}\nStatus: Unknown\nPriority: Unknown\nRequester: {requester_email}"
+                "text": f"🎫 **Ticket #{ticket_id} Updated!**\n📌 **Subject:** {subject}\n🔘 **Status:** {status}\n⚡ **Priority:** {priority}\n👤 **Requester:** {requester_email}"
             }
         }
-        print(telex_payload)
-        
+
+        logging.info(f"Sending to Telex: {telex_payload}")
+
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 TELEX_WEBHOOK_URL,
@@ -57,25 +73,24 @@ async def zendesk_integration(request: Request) -> JSONResponse:
                 follow_redirects=True  # Handle any redirects automatically
             )
             response.raise_for_status()
-            
+
             return JSONResponse(
-                content={
-                    "message": "Sent to Telex",
-                    "telex_payload": telex_payload
-                },
+                content={"message": "Sent to Telex", "telex_payload": telex_payload},
                 status_code=200
             )
-            
+
+    except KeyError as e:
+        logging.error(f"Missing key in request data: {str(e)}")
+        return JSONResponse(content={"error": f"Invalid data: {str(e)}"}, status_code=400)
+
     except httpx.RequestError as e:
-        return JSONResponse(
-            content={"error": f"Failed to send request to Telex: {str(e)}"},
-            status_code=500
-        )
+        logging.error(f"Failed to send request to Telex: {str(e)}")
+        return JSONResponse(content={"error": "Failed to send request to Telex"}, status_code=500)
+
     except Exception as e:
-        return JSONResponse(
-            content={"error": f"Unexpected error: {str(e)}"},
-            status_code=500
-        )
+        logging.error(f"Unexpected error: {str(e)}")
+        return JSONResponse(content={"error": "Internal server error"}, status_code=500)
+
 # # from fastapi import FastAPI, Request
 # # import httpx
 
