@@ -1,12 +1,12 @@
-from typing import Dict, Any
+import hashlib
+import hmac
+import logging
+import os
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 import httpx
-import os
-import uvicorn
-import logging
 
 # Load environment variables
 load_dotenv()
@@ -26,16 +26,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Retrieve Telex webhook details
+# Retrieve Telex & Zendesk webhook details
 TELEX_CHANNEL_ID = os.getenv("TELEX_CHANNEL_ID")
 if not TELEX_CHANNEL_ID:
     raise ValueError("TELEX_CHANNEL_ID is not set in environment variables!")
 
 TELEX_WEBHOOK_URL = f"https://ping.telex.im/v1/webhooks/{TELEX_CHANNEL_ID}"
+ZENDESK_WEBHOOK_SECRET = os.getenv("ZENDESK_WEBHOOK_SECRET")
+
+if not ZENDESK_WEBHOOK_SECRET:
+    raise ValueError("ZENDESK_WEBHOOK_SECRET is not set in environment variables!")
 
 @app.post("/zendesk-integration")
 async def zendesk_integration(request: Request) -> JSONResponse:
     try:
+        # Step 1: Retrieve raw request body
+        body = await request.body()
+
+        # Step 2: Extract Zendesk signature from headers
+        zendesk_signature = request.headers.get("X-Zendesk-Webhook-Signature")
+        if not zendesk_signature:
+            logging.warning("Missing Zendesk signature in request headers")
+            raise HTTPException(status_code=401, detail="Missing Zendesk signature")
+
+        # Step 3: Compute expected HMAC-SHA256 signature
+        computed_signature = hmac.new(
+            key=ZENDESK_WEBHOOK_SECRET.encode(),
+            msg=body,
+            digestmod=hashlib.sha256
+        ).hexdigest()
+
+        # Step 4: Compare the computed signature with the received one
+        if not hmac.compare_digest(computed_signature, zendesk_signature):
+            logging.warning("Invalid Zendesk signature. Possible spoofed request.")
+            raise HTTPException(status_code=403, detail="Invalid Zendesk signature")
+
+        # Step 5: Parse JSON data
         data = await request.json()
         ticket = data.get("ticket", {})
 
@@ -61,6 +87,7 @@ async def zendesk_integration(request: Request) -> JSONResponse:
 
         logging.info(f"Sending to Telex: {telex_payload}")
 
+        # Step 6: Send to Telex.im
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 TELEX_WEBHOOK_URL,
@@ -69,7 +96,7 @@ async def zendesk_integration(request: Request) -> JSONResponse:
                     "Accept": "application/json",
                     "Content-Type": "application/json"
                 },
-                follow_redirects=True  # Handle any redirects automatically
+                follow_redirects=True
             )
             response.raise_for_status()
 
