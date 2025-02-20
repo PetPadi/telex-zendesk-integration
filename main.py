@@ -3,9 +3,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
+import uvicorn
 
 load_dotenv()
-app = FastAPI()
+app = FastAPI(root_path="/")
 
 # Configure CORS
 app.add_middleware(
@@ -57,3 +58,6 @@ async def zendesk_integration(request: Request):
     
     except Exception as e:
         return {"error": "Unexpected error occurred", "details": str(e)}
+    
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000, proxy_headers=True)
