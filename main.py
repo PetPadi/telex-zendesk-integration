@@ -53,7 +53,6 @@ async def zendesk_integration(request: Request) -> JSONResponse:
 
         # Construct payload for Telex
         telex_payload = {
-            "channel": TELEX_CHANNEL_ID,
             "event": "message",
             "data": {
                 "text": f"🎫 **Ticket #{ticket_id} Updated!**\n📌 **Subject:** {subject}\n🔘 **Status:** {status}\n⚡ **Priority:** {priority}\n👤 **Requester:** {requester_email}"
