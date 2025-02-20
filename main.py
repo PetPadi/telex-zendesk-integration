@@ -9,7 +9,7 @@ import uvicorn
 
 load_dotenv()
 
-# Initialize FastAPI without root_path
+# Initialize FastAPI 
 app = FastAPI()
 
 # Configure CORS
@@ -17,7 +17,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["POST", "OPTIONS"],  # Added OPTIONS for preflight
+    allow_methods=["POST", "OPTIONS"],  
     allow_headers=["*"],
 )
 
@@ -29,6 +29,7 @@ async def zendesk_integration(request: Request) -> JSONResponse:
     try:
         data = await request.json()
         ticket = data.get("ticket", {})
+        print(data)
         
         # Extract ticket details
         ticket_id = str(ticket.get("id", "Unknown"))
@@ -43,6 +44,7 @@ async def zendesk_integration(request: Request) -> JSONResponse:
                 "text": f"Ticket #{ticket_id} Updated!\nSubject: {subject}\nStatus: Unknown\nPriority: Unknown\nRequester: {requester_email}"
             }
         }
+        print(telex_payload)
         
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -74,6 +76,36 @@ async def zendesk_integration(request: Request) -> JSONResponse:
             content={"error": f"Unexpected error: {str(e)}"},
             status_code=500
         )
+# # from fastapi import FastAPI, Request
+# # import httpx
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# # app = FastAPI()
+
+# WEBHOOK_URL = "https://ping.telex.im/v1/webhooks/0195154a-3c62-7f11-9cb0-8e892cd7d3ce"
+
+# @app.post("/test")
+# async def test_endpoint():
+#     payload = {
+#         "event_name": "Zendesk integration",
+#         "message": "Zendesk test",
+#         "status": "success",
+#         "username": "Nana"
+#     }
+
+#     headers = {
+#         "Accept": "application/json",
+#         "Content-Type": "application/json"
+#     }
+
+#     async with httpx.AsyncClient() as client:
+#         try:
+#             response = await client.post(WEBHOOK_URL, json=payload, headers=headers)
+#             response.raise_for_status()  # Raise an exception for 4xx/5xx errors
+#             return {"status": "success", "response": response.json()}
+#         except httpx.HTTPStatusError as e:
+#             return {"status": "error", "message": f"HTTP error: {e.response.status_code}", "details": e.response.text}
+#         except httpx.RequestError as e:
+#             return {"status": "error", "message": "Request failed", "details": str(e)}
+
+# if __name__ == "__main__":
+#     uvicorn.run(app, host="0.0.0.0", port=8000)
