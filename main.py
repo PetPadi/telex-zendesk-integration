@@ -1,10 +1,20 @@
 import httpx
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 
 load_dotenv()
 app = FastAPI()
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["POST"],  
+    allow_headers=["*"],
+)
 
 # Telex Webhook Details
 TELEX_CHANNEL_ID = os.getenv("TELEX_CHANNEL_ID")
