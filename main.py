@@ -5,7 +5,8 @@ from typing import Dict, Any, Optional
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, BaseSettings, Field
+from pydantic import BaseModel, Field
+from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 import httpx
 import uvicorn
