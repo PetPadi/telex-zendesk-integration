@@ -45,17 +45,21 @@ async def zendesk_integration(request: Request) -> JSONResponse:
         requester_email = requester.get("email", "Unknown")
         status = ticket.get("status", "Unknown")
         priority = ticket.get("priority", "Unknown")
+        message = ticket.get("latest_comment", {}).get("body") or ticket.get("description") or "No message provided"
 
         # Construct payload for Telex
         telex_payload = {
-            "event_name": "Zendesk Ticket Update",
+            "event_name": "Zendesk New Ticket",
             "username": "ZendeskBot",
             "status": "success",
-            "message": f"\U0001F3AB **Ticket #{ticket_id}\n"
-                        f"\U0001F4CC **Subject:** {subject}\n"
-                        f"\U0001F518 **Status:** {status}\n"
-                        f"⚡ **Priority:** {priority}\n"
-                        f"\U0001F464 **Requester:** {requester_email}"
+            "message": (
+                f"\U0001F3AB **Ticket #{ticket_id}**\n"
+                f"\U0001F4CC **Subject:** {subject}\n"
+                f"\U0001F518 **Status:** {status}\n"
+                f"⚡ **Priority:** {priority}\n"
+                f"\U0001F464 **Requester:** {requester_email}\n"
+                f"\U0001F4AC **Message:** {message}"
+            )
         }
 
         # Send to Telex.im
