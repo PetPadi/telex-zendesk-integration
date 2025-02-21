@@ -1,8 +1,6 @@
-import hashlib
-import hmac
 import logging
 import os
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
@@ -26,42 +24,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Retrieve Telex & Zendesk webhook details
+# Retrieve Telex webhook details
 TELEX_CHANNEL_ID = os.getenv("TELEX_CHANNEL_ID")
 if not TELEX_CHANNEL_ID:
     raise ValueError("TELEX_CHANNEL_ID is not set in environment variables!")
 
 TELEX_WEBHOOK_URL = f"https://ping.telex.im/v1/webhooks/{TELEX_CHANNEL_ID}"
-ZENDESK_WEBHOOK_SECRET = os.getenv("ZENDESK_WEBHOOK_SECRET")
-
-if not ZENDESK_WEBHOOK_SECRET:
-    raise ValueError("ZENDESK_WEBHOOK_SECRET is not set in environment variables!")
 
 @app.post("/zendesk-integration")
 async def zendesk_integration(request: Request) -> JSONResponse:
     try:
-        # Step 1: Retrieve raw request body
-        body = await request.body()
-
-        # Step 2: Extract Zendesk signature from headers
-        zendesk_signature = request.headers.get("X-Zendesk-Webhook-Signature")
-        if not zendesk_signature:
-            logging.warning("Missing Zendesk signature in request headers")
-            raise HTTPException(status_code=401, detail="Missing Zendesk signature")
-
-        # Step 3: Compute expected HMAC-SHA256 signature
-        computed_signature = hmac.new(
-            key=ZENDESK_WEBHOOK_SECRET.encode(),
-            msg=body,
-            digestmod=hashlib.sha256
-        ).hexdigest()
-
-        # Step 4: Compare the computed signature with the received one
-        if not hmac.compare_digest(computed_signature, zendesk_signature):
-            logging.warning("Invalid Zendesk signature. Possible spoofed request.")
-            raise HTTPException(status_code=403, detail="Invalid Zendesk signature")
-
-        # Step 5: Parse JSON data
+        # Parse JSON data
         data = await request.json()
         ticket = data.get("ticket", {})
 
@@ -87,7 +60,7 @@ async def zendesk_integration(request: Request) -> JSONResponse:
 
         logging.info(f"Sending to Telex: {telex_payload}")
 
-        # Step 6: Send to Telex.im
+        # Send to Telex.im
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 TELEX_WEBHOOK_URL,
@@ -117,36 +90,36 @@ async def zendesk_integration(request: Request) -> JSONResponse:
         logging.error(f"Unexpected error: {str(e)}")
         return JSONResponse(content={"error": "Internal server error"}, status_code=500)
 
-# # from fastapi import FastAPI, Request
-# # import httpx
+# # # from fastapi import FastAPI, Request
+# # # import httpx
 
-# # app = FastAPI()
+# # # app = FastAPI()
 
-# WEBHOOK_URL = "https://ping.telex.im/v1/webhooks/0195154a-3c62-7f11-9cb0-8e892cd7d3ce"
+# # WEBHOOK_URL = "https://ping.telex.im/v1/webhooks/0195154a-3c62-7f11-9cb0-8e892cd7d3ce"
 
-# @app.post("/test")
-# async def test_endpoint():
-#     payload = {
-#         "event_name": "Zendesk integration",
-#         "message": "Zendesk test",
-#         "status": "success",
-#         "username": "Nana"
-#     }
+# # @app.post("/test")
+# # async def test_endpoint():
+# #     payload = {
+# #         "event_name": "Zendesk integration",
+# #         "message": "Zendesk test",
+# #         "status": "success",
+# #         "username": "Nana"
+# #     }
 
-#     headers = {
-#         "Accept": "application/json",
-#         "Content-Type": "application/json"
-#     }
+# #     headers = {
+# #         "Accept": "application/json",
+# #         "Content-Type": "application/json"
+# #     }
 
-#     async with httpx.AsyncClient() as client:
-#         try:
-#             response = await client.post(WEBHOOK_URL, json=payload, headers=headers)
-#             response.raise_for_status()  # Raise an exception for 4xx/5xx errors
-#             return {"status": "success", "response": response.json()}
-#         except httpx.HTTPStatusError as e:
-#             return {"status": "error", "message": f"HTTP error: {e.response.status_code}", "details": e.response.text}
-#         except httpx.RequestError as e:
-#             return {"status": "error", "message": "Request failed", "details": str(e)}
+# #     async with httpx.AsyncClient() as client:
+# #         try:
+# #             response = await client.post(WEBHOOK_URL, json=payload, headers=headers)
+# #             response.raise_for_status()  # Raise an exception for 4xx/5xx errors
+# #             return {"status": "success", "response": response.json()}
+# #         except httpx.HTTPStatusError as e:
+# #             return {"status": "error", "message": f"HTTP error: {e.response.status_code}", "details": e.response.text}
+# #         except httpx.RequestError as e:
+# #             return {"status": "error", "message": "Request failed", "details": str(e)}
 
-# if __name__ == "__main__":
-#     uvicorn.run(app, host="0.0.0.0", port=8000)
+# # if __name__ == "__main__":
+# #     uvicorn.run(app, host="0.0.0.0", port=8000)
