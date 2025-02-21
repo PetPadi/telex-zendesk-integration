@@ -51,7 +51,7 @@ async def zendesk_integration(request: Request) -> JSONResponse:
             "event_name": "Zendesk Ticket Update",
             "username": "ZendeskBot",
             "status": "success",
-            "message": f"\U0001F3AB **Ticket #{ticket_id} Updated!**\n"
+            "message": f"\U0001F3AB **Ticket #{ticket_id}\n"
                         f"\U0001F4CC **Subject:** {subject}\n"
                         f"\U0001F518 **Status:** {status}\n"
                         f"⚡ **Priority:** {priority}\n"
