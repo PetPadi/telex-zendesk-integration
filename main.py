@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 import httpx
+import json  # NEW: Added for pretty printing logs
 
 # Load environment variables
 load_dotenv()
@@ -12,8 +13,12 @@ load_dotenv()
 # Initialize FastAPI
 app = FastAPI()
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# NEW: Configure detailed logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Configure CORS
 app.add_middleware(
@@ -34,12 +39,19 @@ TELEX_WEBHOOK_URL = f"https://ping.telex.im/v1/webhooks/{TELEX_CHANNEL_ID}"
 @app.post("/zendesk-integration")
 async def zendesk_integration(request: Request) -> JSONResponse:
     try:
+        # NEW: Log incoming request
+        logger.info("Received webhook request from Zendesk")
+        
         # Parse JSON data
         data = await request.json()
+        # NEW: Log incoming data
+        logger.info("Incoming Zendesk data: %s", json.dumps(data, indent=2))
+        
         ticket = data.get("ticket", {})
 
         # Validate required fields
         if not ticket:
+            logger.error("Missing ticket data in request")  # NEW: Added error logging
             raise KeyError("Missing 'ticket' data in request.")
 
         # Extract ticket details safely
@@ -50,6 +62,16 @@ async def zendesk_integration(request: Request) -> JSONResponse:
         status = ticket.get("status", "Unknown")
         priority = ticket.get("priority", "Unknown")
 
+        # NEW: Log extracted ticket details
+        logger.info(
+            "Extracted ticket details:\n"
+            f"Ticket ID: {ticket_id}\n"
+            f"Subject: {subject}\n"
+            f"Status: {status}\n"
+            f"Priority: {priority}\n"
+            f"Requester: {requester_email}"
+        )
+
         # Construct payload for Telex
         telex_payload = {
             "event": "message",
@@ -58,10 +80,14 @@ async def zendesk_integration(request: Request) -> JSONResponse:
             }
         }
 
-        logging.info(f"Sending to Telex: {telex_payload}")
+        # NEW: Log Telex payload
+        logger.info("Sending payload to Telex: %s", json.dumps(telex_payload, indent=2))
 
         # Send to Telex.im
         async with httpx.AsyncClient() as client:
+            # NEW: Log the request to Telex
+            logger.info(f"Sending request to Telex URL: {TELEX_WEBHOOK_URL}")
+            
             response = await client.post(
                 TELEX_WEBHOOK_URL,
                 json=telex_payload,
@@ -72,6 +98,10 @@ async def zendesk_integration(request: Request) -> JSONResponse:
                 follow_redirects=True
             )
             response.raise_for_status()
+            
+            # NEW: Log Telex response
+            logger.info(f"Telex response status code: {response.status_code}")
+            logger.info(f"Telex response content: {response.text}")
 
             return JSONResponse(
                 content={"message": "Sent to Telex", "telex_payload": telex_payload},
@@ -79,16 +109,19 @@ async def zendesk_integration(request: Request) -> JSONResponse:
             )
 
     except KeyError as e:
-        logging.error(f"Missing key in request data: {str(e)}")
-        return JSONResponse(content={"error": f"Invalid data: {str(e)}"}, status_code=400)
+        error_msg = f"Missing key in request data: {str(e)}"
+        logger.error(error_msg)  # NEW: Enhanced error logging
+        return JSONResponse(content={"error": error_msg}, status_code=400)
 
     except httpx.RequestError as e:
-        logging.error(f"Failed to send request to Telex: {str(e)}")
-        return JSONResponse(content={"error": "Failed to send request to Telex"}, status_code=500)
+        error_msg = f"Failed to send request to Telex: {str(e)}"
+        logger.error(error_msg)  # NEW: Enhanced error logging
+        return JSONResponse(content={"error": error_msg}, status_code=500)
 
     except Exception as e:
-        logging.error(f"Unexpected error: {str(e)}")
-        return JSONResponse(content={"error": "Internal server error"}, status_code=500)
+        error_msg = f"Unexpected error: {str(e)}"
+        logger.error(error_msg)  # NEW: Enhanced error logging
+        return JSONResponse(content={"error": error_msg}, status_code=500)
 
 # # # from fastapi import FastAPI, Request
 # # # import httpx
